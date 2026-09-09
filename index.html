@@ -8,7 +8,85 @@
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#10b981">
 <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f69a.png">
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+const firebaseConfig = {"apiKey": "AIzaSyCfWO5UB9DNnZNt-H6QmuSscYYhIfJrSHQ", "authDomain": "smeny-app-706cc.firebaseapp.com", "projectId": "smeny-app-706cc", "storageBucket": "smeny-app-706cc.firebasestorage.app", "messagingSenderId": "837726816614", "appId": "1:837726816614:web:c7070d9759b8d2e4ba20a7", "measurementId": "G-9GGBPQ10KZ"};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+window.firebaseAuth = auth;
+window.firebaseSignIn = () => signInWithPopup(auth, provider);
+window.firebaseSignOut = () => signOut(auth);
+
+onAuthStateChanged(auth, (user) => {
+  window.dispatchEvent(new CustomEvent('firebase-user', {detail: user}));
+  localStorage.setItem('smeny_firebase_user', JSON.stringify(user ? {email: user.email, name: user.displayName, picture: user.photoURL, uid: user.uid} : null));
+});
+
+// Restore user
+const saved = localStorage.getItem('smeny_firebase_user');
+if(saved && saved!='null'){
+  try{ window.dispatchEvent(new CustomEvent('firebase-user', {detail: JSON.parse(saved)})); }catch(e){}
+}
+</script>
+<style>
+#google-bar{position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border-bottom:1px solid #e4e4e7;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-family:system-ui}
+.dark #google-bar{background:rgba(24,24,27,0.95);border-color:#27272a;color:white}
+#google-bar button{border-radius:9999px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.btn-google{background:#fff;border:1px solid #e4e4e7;display:flex;align-items:center;gap:8px}
+.btn-logout{background:#18181b;color:#fff;border:0}
+</style>
 </head>
+
+<div id="google-bar">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="width:28px;height:28px;border-radius:50%;background:#10b981;display:grid;place-items:center;color:white;font-weight:bold">S</div>
+    <strong style="font-size:14px">Směny</strong>
+    <span id="user-label" style="font-size:12px;color:#71717a"></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <img id="user-avatar" style="width:28px;height:28px;border-radius:50%;display:none" />
+    <button id="btn-login" class="btn-google"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="16" /> Přihlásit přes Google</button>
+    <button id="btn-logout" class="btn-logout" style="display:none">Odhlásit</button>
+  </div>
+</div>
+<script>
+const loginBtn = document.getElementById('btn-login');
+const logoutBtn = document.getElementById('btn-logout');
+const label = document.getElementById('user-label');
+const avatar = document.getElementById('user-avatar');
+
+function updateUserUI(user){
+  const u = user?.detail || user;
+  const real = u && (u.email || u.displayName) ? u : (u?.detail ? u.detail : null);
+  // handle CustomEvent
+  let data = u;
+  if(u && u.detail) data = u.detail;
+  if(!data || data==='null'){ 
+    label.textContent='Nepřihlášen'; 
+    avatar.style.display='none'; 
+    loginBtn.style.display='flex'; 
+    logoutBtn.style.display='none'; 
+    return;
+  }
+  label.textContent = (data.displayName || data.name || '') + ' • ' + (data.email || '');
+  if(data.photoURL || data.picture){ avatar.src = data.photoURL || data.picture; avatar.style.display='block'; }
+  loginBtn.style.display='none'; logoutBtn.style.display='block';
+}
+
+loginBtn.onclick = () => { window.firebaseSignIn().catch(e=>alert('Chyba: '+e.message)); };
+logoutBtn.onclick = () => { window.firebaseSignOut(); };
+
+window.addEventListener('firebase-user', updateUserUI);
+window.addEventListener('load', ()=>{
+  document.body.style.paddingTop='52px';
+  const saved = localStorage.getItem('smeny_firebase_user');
+  if(saved) try{ updateUserUI(JSON.parse(saved)); }catch(e){}
+});
+</script>
 <body>
   <div id="root"></div>
   
